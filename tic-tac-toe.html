@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tic Tac Toe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one centered column on graph paper; scoreboard, then a 3x3 board drawn in pencil strokes, then controls. */
+:root {
+  --paper: #f3f5f2;
+  --grid: #d7e0e6;
+  --ink: #1f2a33;
+  --muted: #5f6d78;
+  --x: #2b59c3;
+  --o: #c2410c;
+  --win: #e9b949;
+  --card: #ffffffcc;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141b22; --grid: #1f2a35; --ink: #e6edf2; --muted: #93a2ae;
+    --x: #7aa2ff; --o: #ff8a4c; --win: #d9a93a; --card: #1a232ccc; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141b22; --grid: #1f2a35; --ink: #e6edf2; --muted: #93a2ae;
+  --x: #7aa2ff; --o: #ff8a4c; --win: #d9a93a; --card: #1a232ccc; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font-family: var(--mono);
+  padding: 0 16px;
+}
+main {
+  max-width: 440px; margin: 0 auto; padding-block: 32px 40px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+h1 {
+  font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 9vw, 3.2rem);
+  line-height: 1; margin: 0; letter-spacing: -0.02em; text-wrap: balance;
+}
+h1 .x { color: var(--x); } h1 .o { color: var(--o); }
+
+.modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.modes button, .actions button {
+  font: 600 0.8rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase;
+  border: 1.5px solid var(--ink); background: var(--card); color: var(--ink);
+  padding: 8px 12px; border-radius: 4px; cursor: pointer;
+}
+.modes button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+button:focus-visible, .cell:focus-visible { outline: 3px solid var(--win); outline-offset: 2px; }
+
+.score {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.score div {
+  background: var(--card); border: 1.5px solid var(--grid); border-radius: 4px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 2px;
+}
+.score div.turn { border-color: currentColor; }
+.score .lbl { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.score .num { font-family: var(--display); font-size: 1.6rem; font-weight: 800; }
+#sx { color: var(--x); } #so { color: var(--o); } #sd { color: var(--muted); }
+
+.status { font-size: 1rem; min-height: 1.5em; margin: 0; }
+
+.board {
+  position: relative; width: 100%; aspect-ratio: 1; max-width: 100%;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+}
+.board > svg.lines, .board > svg.strike { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lines path { stroke: var(--ink); stroke-width: 2.2; fill: none; stroke-linecap: round; }
+.strike path { stroke: var(--win); stroke-width: 5; fill: none; stroke-linecap: round;
+  stroke-dasharray: 400; stroke-dashoffset: 400; transition: stroke-dashoffset .45s ease-out; }
+.strike.on path { stroke-dashoffset: 0; }
+.cell {
+  background: transparent; border: 0; padding: 14%; cursor: pointer; color: inherit;
+  display: grid; place-items: center;
+}
+.cell:disabled { cursor: default; }
+.cell:not(:disabled):hover { background: color-mix(in srgb, var(--grid) 45%, transparent); }
+.cell svg { width: 100%; height: 100%; overflow: visible; }
+.cell path, .cell circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+.cell .mx { stroke: var(--x); } .cell .mo { stroke: var(--o); }
+.draw { stroke-dasharray: 300; stroke-dashoffset: 300; animation: draw .28s ease-out forwards; }
+.draw.d2 { animation-delay: .14s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.board.over .cell:not(.won) svg { opacity: .35; transition: opacity .3s; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions .primary { background: var(--ink); color: var(--paper); }
+.hint { font-size: 0.75rem; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .draw { animation: none; stroke-dashoffset: 0; }
+  .strike path { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Tic <span class="x">Tac</span> <span class="o">Toe</span></h1>
+
+  <div class="modes" role="group" aria-label="Opponent">
+    <button id="m-cpu" data-mode="cpu" aria-pressed="true">vs Computer</button>
+    <button id="m-2p" data-mode="2p" aria-pressed="false">2 Players</button>
+    <button id="m-diff" title="Computer difficulty">Level: Hard</button>
+  </div>
+
+  <div class="score" aria-live="polite">
+    <div id="sx"><span class="lbl" id="lx">You · X</span><span class="num" id="nx">0</span></div>
+    <div id="sd"><span class="lbl">Draws</span><span class="num" id="nd">0</span></div>
+    <div id="so"><span class="lbl" id="lo">CPU · O</span><span class="num" id="no">0</span></div>
+  </div>
+
+  <p class="status" id="status" aria-live="polite"></p>
+
+  <div class="board" id="board">
+    <svg class="lines" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M101 6 C99 100 103 200 100 294"/>
+      <path d="M199 5 C201 110 198 190 200 295"/>
+      <path d="M6 100 C100 102 200 98 294 101"/>
+      <path d="M5 200 C110 198 190 202 295 199"/>
+    </svg>
+    <svg class="strike" id="strike" viewBox="0 0 300 300" aria-hidden="true"><path d=""/></svg>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="again">New round</button>
+    <button id="reset">Reset score</button>
+  </div>
+  <p class="hint">Keys 1–9 play the matching square (numpad layout: 7 8 9 on top). X always starts the first round; starters alternate after that.</p>
+</main>
+
+<script>
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const LEVELS = ["Easy", "Medium", "Hard"];
+const boardEl = document.getElementById("board");
+const statusEl = document.getElementById("status");
+const strike = document.getElementById("strike");
+let S;
+
+function fresh() {
+  return { cells: Array(9).fill(null), mode: "cpu", level: 2, score: { X: 0, O: 0, D: 0 },
+           starter: "X", turn: "X", over: false, win: null };
+}
+
+function winner(c) {
+  for (const l of LINES) if (c[l[0]] && c[l[0]] === c[l[1]] && c[l[0]] === c[l[2]]) return { p: c[l[0]], line: l };
+  return c.every(Boolean) ? { p: "D" } : null;
+}
+
+function minimax(c, me, turn, depth) {
+  const w = winner(c);
+  if (w) return w.p === "D" ? 0 : (w.p === me ? 10 - depth : depth - 10);
+  let best = turn === me ? -Infinity : Infinity;
+  for (let i = 0; i < 9; i++) if (!c[i]) {
+    c[i] = turn;
+    const v = minimax(c, me, turn === "X" ? "O" : "X", depth + 1);
+    c[i] = null;
+    best = turn === me ? Math.max(best, v) : Math.min(best, v);
+  }
+  return best;
+}
+
+function cpuMove() {
+  const c = S.cells.slice(), open = c.map((v, i) => v ? -1 : i).filter(i => i >= 0);
+  const random = open[Math.floor(Math.random() * open.length)];
+  const chance = [0.85, 0.35, 0][S.level];
+  if (Math.random() < chance) return random;
+  let best = -Infinity, picks = [];
+  for (const i of open) {
+    c[i] = "O"; const v = minimax(c, "O", "X", 1); c[i] = null;
+    if (v > best) { best = v; picks = [i]; } else if (v === best) picks.push(i);
+  }
+  return picks[Math.floor(Math.random() * picks.length)];
+}
+
+function markSVG(p) {
+  return p === "X"
+    ? '<svg viewBox="0 0 100 100"><path class="mx draw" d="M14 16 L86 84"/><path class="mx draw d2" d="M86 14 L15 86"/></svg>'
+    : '<svg viewBox="0 0 100 100"><path class="mo draw" d="M50 12 C78 12 89 32 88 52 C87 76 68 89 49 88 C26 87 12 70 12 49 C12 28 28 13 54 14"/></svg>';
+}
+
+function play(i) {
+  if (S.over || S.cells[i]) return;
+  S.cells[i] = S.turn;
+  const cell = boardEl.querySelectorAll(".cell")[i];
+  cell.innerHTML = markSVG(S.turn);
+  const w = winner(S.cells);
+  if (w) {
+    S.over = true; S.win = w;
+    S.score[w.p] += 1;
+  } else {
+    S.turn = S.turn === "X" ? "O" : "X";
+  }
+  render(false);
+  if (!S.over && S.mode === "cpu" && S.turn === "O") {
+    boardEl.dataset.wait = "1";
+    setTimeout(() => { delete boardEl.dataset.wait; play(cpuMove()); }, 380);
+  }
+}
+
+function centre(i) { return [50 + (i % 3) * 100, 50 + Math.floor(i / 3) * 100]; }
+
+function render(rebuild) {
+  if (rebuild) {
+    boardEl.querySelectorAll(".cell").forEach(n => n.remove());
+    S.cells.forEach((p, i) => {
+      const b = document.createElement("button");
+      b.className = "cell"; b.id = "cell-" + i;
+      b.addEventListener("click", () => { if (!boardEl.dataset.wait) play(i); });
+      if (p) b.innerHTML = markSVG(p);
+      boardEl.insertBefore(b, strike);
+    });
+  }
+  const cells = boardEl.querySelectorAll(".cell");
+  const cpuTurn = S.mode === "cpu" && S.turn === "O";
+  cells.forEach((b, i) => {
+    b.disabled = S.over || !!S.cells[i] || cpuTurn;
+    b.setAttribute("aria-label", "Square " + (i + 1) + (S.cells[i] ? ", " + S.cells[i] : ", empty"));
+    b.classList.toggle("won", !!(S.win && S.win.line && S.win.line.includes(i)));
+  });
+  boardEl.classList.toggle("over", S.over);
+
+  const sp = strike.querySelector("path");
+  if (S.win && S.win.line) {
+    const [a, , c] = S.win.line, [x1, y1] = centre(a), [x2, y2] = centre(c);
+    const dx = Math.sign(x2 - x1) * 30, dy = Math.sign(y2 - y1) * 30;
+    sp.setAttribute("d", `M${x1 - dx} ${y1 - dy} L${x2 + dx} ${y2 + dy}`);
+    requestAnimationFrame(() => strike.classList.add("on"));
+  } else { strike.classList.remove("on"); sp.setAttribute("d", ""); }
+
+  const cpu = S.mode === "cpu";
+  document.getElementById("lx").textContent = cpu ? "You · X" : "Player X";
+  document.getElementById("lo").textContent = cpu ? "CPU · O" : "Player O";
+  document.getElementById("nx").textContent = S.score.X;
+  document.getElementById("no").textContent = S.score.O;
+  document.getElementById("nd").textContent = S.score.D;
+  document.getElementById("sx").classList.toggle("turn", !S.over && S.turn === "X");
+  document.getElementById("so").classList.toggle("turn", !S.over && S.turn === "O");
+  document.querySelectorAll(".modes [data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === S.mode));
+  const diff = document.getElementById("m-diff");
+  diff.textContent = "Level: " + LEVELS[S.level]; diff.hidden = !cpu;
+
+  let msg;
+  if (S.win) {
+    if (S.win.p === "D") msg = "Cat's game. Nobody wins this one.";
+    else if (cpu) msg = S.win.p === "X" ? "You win! Three in a row." : "The computer wins this round.";
+    else msg = "Player " + S.win.p + " wins!";
+  } else if (cpu) msg = S.turn === "X" ? "Your move. You're X." : "Computer is thinking…";
+  else msg = "Player " + S.turn + " to move.";
+  statusEl.textContent = msg;
+}
+
+function newRound(keepStarter) {
+  if (!keepStarter) S.starter = S.starter === "X" ? "O" : "X";
+  S.cells = Array(9).fill(null); S.turn = S.starter; S.over = false; S.win = null;
+  render(true);
+  if (S.mode === "cpu" && S.turn === "O") {
+    boardEl.dataset.wait = "1";
+    setTimeout(() => { delete boardEl.dataset.wait; play(cpuMove()); }, 450);
+  }
+}
+
+document.querySelectorAll(".modes [data-mode]").forEach(b => b.addEventListener("click", () => {
+  if (S.mode === b.dataset.mode) return;
+  S.mode = b.dataset.mode; S.score = { X: 0, O: 0, D: 0 }; S.starter = "X"; newRound(true);
+}));
+document.getElementById("m-diff").addEventListener("click", () => {
+  S.level = (S.level + 1) % 3; S.score = { X: 0, O: 0, D: 0 }; S.starter = "X"; newRound(true);
+});
+document.getElementById("again").addEventListener("click", () => newRound(false));
+document.getElementById("reset").addEventListener("click", () => { S.score = { X: 0, O: 0, D: 0 }; S.starter = "X"; newRound(true); });
+document.addEventListener("keydown", e => {
+  const map = { 7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8 };
+  if (e.key in map) {
+    const b = boardEl.querySelectorAll(".cell")[map[e.key]];
+    if (b && !b.disabled && !boardEl.dataset.wait) play(map[e.key]);
+  } else if (e.key === "n" || e.key === "N") newRound(false);
+});
+
+S = fresh();
+render(true);
+</script>
+</body>
+</html>
